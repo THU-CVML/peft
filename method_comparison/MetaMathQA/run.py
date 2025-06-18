@@ -407,7 +407,9 @@ def main(*, path_experiment: str, experiment_name: str, clean: bool) -> None:
 
     # save the model in temp dir, get file size, clean it up afterwards if clean is passed
     try:
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True, delete=clean) as tmp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True, 
+                                        #  delete=clean
+                                         ) as tmp_dir:
             model.save_pretrained(tmp_dir)
             stat = os.stat(os.path.join(tmp_dir, SAFETENSORS_WEIGHTS_NAME))
             file_size = stat.st_size

@@ -47,6 +47,9 @@ from peft.optimizers import create_lorafa_optimizer, create_loraplus_optimizer
 from peft.utils import CONFIG_NAME
 
 
+
+
+
 if not torch.cuda.is_available():
     raise RuntimeError("CUDA is not available, currently only CUDA is supported")
 
@@ -62,6 +65,11 @@ RESULT_PATH_TEST = os.path.join(os.path.dirname(__file__), "temporary_results")
 RESULT_PATH_CANCELLED = os.path.join(os.path.dirname(__file__), "cancelled_results")
 hf_api = huggingface_hub.HfApi()
 WARMUP_STEP_RATIO = 0.1
+
+from modelscope import AutoTokenizer, AutoModelForCausalLM
+# from modelscope import HubApi
+# ms_api = HubApi()
+# hf_api.model_info = ms_api.get_model
 
 
 @dataclass
