@@ -1,0 +1,8 @@
+kernel_name: "poly+1"
+latent_dim: 32
+modified_modules: ["q_proj", "v_proj"]
+lora_alpha: 64
+pissa: False
+# pissa: True
+pissa_lr: 1e-2
+pissa_steps: 100

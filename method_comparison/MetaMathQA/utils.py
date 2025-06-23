@@ -25,7 +25,7 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from decimal import Decimal, DivisionByZero, InvalidOperation
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Literal, Optional, Dict
 
 import bitsandbytes
 import datasets
@@ -252,6 +252,7 @@ def get_model(
     attn_implementation: Optional[str],
     peft_config: Optional[PeftConfig],
     autocast_adapter_dtype: bool,
+    yuequ_config:Optional[Dict],
 ) -> nn.Module:
     base_model = get_base_model(
         model_id=model_id, dtype=dtype, compile=compile, attn_implementation=attn_implementation
@@ -260,6 +261,16 @@ def get_model(
         model = base_model
     else:
         model = get_peft_model(base_model, peft_config, autocast_adapter_dtype=autocast_adapter_dtype)
+        
+    if yuequ_config is not None:
+        from boguan_yuequ.algorithms.lora.kernel_lora.auto import get_light_kernel_tuning_model
+        model = get_light_kernel_tuning_model(
+            model=model, 
+            kernel_dtype = eval(f"torch.{dtype}"), 
+            **yuequ_config
+        )
+        model = model.cuda()
+        
     return model
 
 
@@ -627,8 +638,12 @@ def log_results(
 ) -> None:
     # collect results
     cuda_memory_final = torch.cuda.max_memory_reserved()
-    cuda_memory_avg = int(sum(train_result.cuda_memory_reserved_log) / len(train_result.cuda_memory_reserved_log))
-    cuda_memory_reserved_99th = int(np.percentile(train_result.cuda_memory_reserved_log, 99))
+    if len(train_result.cuda_memory_reserved_log) != 0:
+        cuda_memory_avg = int(sum(train_result.cuda_memory_reserved_log) / len(train_result.cuda_memory_reserved_log))
+        cuda_memory_reserved_99th = int(np.percentile(train_result.cuda_memory_reserved_log, 99))
+    else:
+        cuda_memory_avg = 0
+        cuda_memory_reserved_99th = 0
 
     meta_info = get_meta_info()
     if model_info is not None:

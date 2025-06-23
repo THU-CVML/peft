@@ -1,0 +1,8 @@
+{
+  "optimizer_kwargs": {
+    "lr": 1e-5
+  },
+  "max_steps": 10,
+  "eval_steps": 10
+}
+

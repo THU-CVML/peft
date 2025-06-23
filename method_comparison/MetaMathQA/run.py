@@ -370,6 +370,13 @@ def main(*, path_experiment: str, experiment_name: str, clean: bool) -> None:
         peft_config = PeftConfig.from_pretrained(path_experiment)
     else:
         print_verbose(f"Could not find PEFT config at {path_experiment}, performing FULL FINETUNING")
+    yuequ_config = None
+    yuequ_config_path = os.path.join(path_experiment, "yuequ_config.yaml")
+    if os.path.exists(yuequ_config_path):
+        print_verbose("博观而约取，厚积而薄发。")
+        import yaml
+        with open(yuequ_config_path, 'r') as f:
+            yuequ_config = yaml.full_load(f)
     path_train_config = os.path.join(path_experiment, FILE_NAME_TRAIN_PARAMS)
     train_config = get_train_config(path_train_config)
     set_seed(train_config.seed)
@@ -388,8 +395,11 @@ def main(*, path_experiment: str, experiment_name: str, clean: bool) -> None:
         attn_implementation=train_config.attn_implementation,
         peft_config=peft_config,
         autocast_adapter_dtype=train_config.autocast_adapter_dtype,
+        yuequ_config=yuequ_config,
     )
     print_verbose(model)
+    from boguan_yuequ.infra import print_model_pretty
+    model.print_model_pretty()
 
     # train model
     train_result = train(
