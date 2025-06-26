@@ -60,6 +60,12 @@ from peft import AdaLoraConfig, PeftConfig
 from peft.utils import CONFIG_NAME
 
 
+# logging
+import swanlab
+
+
+
+
 # # suppress all warnings
 # warnings.filterwarnings("ignore") # FIXME?
 
@@ -225,10 +231,16 @@ def train(
 
             losses.append(loss.item())
             pbar.set_postfix({"loss": loss.item()})
+            
             cuda_memory_allocated_log.append(torch.cuda.memory_allocated() - cuda_memory_init)
             cuda_memory_reserved_log.append(torch.cuda.memory_reserved() - cuda_memory_init)
             toc = time.perf_counter()
             durations.append(toc - tic)
+
+            swanlab.log({
+                "batch train loss": loss.item()
+            })
+
 
             # every couple of steps, evaluate; this can be slow due to generation
             if step % eval_steps == 0:
@@ -254,6 +266,7 @@ def train(
                 example = textwrap.shorten(example, width=750)
                 example = textwrap.indent(example, "    ")
                 print_verbose(f"\nExample prediction:\n{example}\n")
+                swanlab.log({"example prediction": swanlab.Text(example)})
                 accuracy = get_accuracy(predictions=predictions, responses=responses)
                 num_tokens_generated = sum(sum(mask) for mask in tokenizer(predictions)["attention_mask"])
 
@@ -262,8 +275,7 @@ def train(
                 eval_time += toc_eval - tic_eval
                 elapsed = time.perf_counter() - tic_train
 
-                metrics.append(
-                    {
+                metric = {
                         "step": step,
                         "valid accuracy": accuracy,
                         "train loss": loss_avg,
@@ -274,28 +286,34 @@ def train(
                         "mem allocated avg": memory_allocated_avg,
                         "mem reserved avg": memory_reserved_avg,
                         "elapsed time": elapsed,
+                        "learning rate": lr_scheduler.get_last_lr()[0],
+                        "generated valid tokens": num_tokens_generated,
+
                     }
+                metrics.append(
+                    metric
                 )
 
-                log_dict = {
-                    "step": f"{step:5d}",
-                    "samples": f"{total_samples:7d}",
-                    "lr": f"{lr_scheduler.get_last_lr()[0]:.2e}",
-                    "loss avg": f"{loss_avg:.4f}",
-                    "valid acc": f"{accuracy:.3f}",
-                    "gen valid tokens": num_tokens_generated,
-                    "train time": f"{dur_train:.1f}s",
-                    "eval time": f"{dur_eval:.1f}s",
-                    "train tokens / sec": f"{tokens_per_sec:.0f}",
-                    "mem allocated": f"{memory_allocated_avg:.0f}",
-                    "mem reserved": f"{memory_reserved_avg:.0f}",
-                    "elapsed time": f"{elapsed // 60:.0f}min {elapsed % 60:.0f}s",
-                }
-                print_verbose(json.dumps(log_dict))
+                # log_dict = {
+                #     "step": f"{step:5d}",
+                #     "samples": f"{total_samples:7d}",
+                #     "lr": f"{lr_scheduler.get_last_lr()[0]:.2e}",
+                #     "loss avg": f"{loss_avg:.4f}",
+                #     "valid acc": f"{accuracy:.3f}",
+                #     "gen valid tokens": num_tokens_generated,
+                #     "train time": f"{dur_train:.1f}s",
+                #     "eval time": f"{dur_eval:.1f}s",
+                #     "train tokens / sec": f"{tokens_per_sec:.0f}",
+                #     "mem allocated": f"{memory_allocated_avg:.0f}",
+                #     "mem reserved": f"{memory_reserved_avg:.0f}",
+                #     "elapsed time": f"{elapsed // 60:.0f}min {elapsed % 60:.0f}s",
+                # }
+                print_verbose(json.dumps(metric))
+                swanlab.log(metric)
 
-            # # TODO is this needed?
-            torch.cuda.empty_cache()
-            gc.collect()
+            # # TODO is this needed? No, 这会让我们无法占住显存。
+            # torch.cuda.empty_cache()
+            # gc.collect()
 
         print_verbose(f"Training finished after {max_steps} steps, evaluation on test set follows.")
         # test set evaluation
@@ -309,16 +327,20 @@ def train(
             use_tqdm=len(ds_test) > 100,
         )
         accuracy = get_accuracy(predictions=predictions, responses=responses)
-        metrics.append(
-            {
+
+        metric = {
                 "step": step,
                 "test accuracy": accuracy,
                 "train loss": sum(losses[-eval_steps:]) / eval_steps,
                 "train samples": total_samples,
                 "train total tokens": sum(total_tokens),
             }
+        metrics.append(
+            metric
         )
-        print_verbose(f"Test accuracy: {accuracy:.3f}")
+        print_verbose(json.dumps(metric))
+        swanlab.log(metric)
+        # print_verbose(f"Test accuracy: {accuracy:.3f}")
 
     except KeyboardInterrupt:
         print_verbose("canceled training")
@@ -351,7 +373,7 @@ def train(
     )
     return train_result
 
-
+from dataclasses import asdict
 def main(*, path_experiment: str, experiment_name: str, clean: bool) -> None:
     tic_total = time.perf_counter()
     start_date = dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0).isoformat()
@@ -380,6 +402,20 @@ def main(*, path_experiment: str, experiment_name: str, clean: bool) -> None:
     path_train_config = os.path.join(path_experiment, FILE_NAME_TRAIN_PARAMS)
     train_config = get_train_config(path_train_config)
     set_seed(train_config.seed)
+
+    run = swanlab.init(
+        # 设置项目
+        project="peft-method_comparison-MetaMathQA-gsm8k",
+        experiment_name = experiment_name, 
+        description = path_experiment, 
+        # 跟踪超参数与实验元数据
+        config={
+            "peft_config": peft_config,
+            "yuequ_config": yuequ_config,
+            "train_config": asdict(train_config),
+        },
+         tags=["MetaMathQA", "gsm8k", "yuequ"],
+    )
 
     # initialize objects
     cuda_memory_init = init_cuda()
