@@ -1,0 +1,9 @@
+kernel_name: "tanh"
+latent_dim: 8
+modified_modules: ["q_proj", "v_proj"]
+lora_alpha: 64
+# lora_alpha: 512
+# pissa: False
+pissa: True
+# pissa_lr: 1e-2
+# pissa_steps: 100
