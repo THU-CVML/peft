@@ -63,8 +63,7 @@ from peft.utils import CONFIG_NAME
 # logging
 import swanlab
 
-
-
+from boguan_yuequ.algorithms.lora.kernel_lora.auto import collect_model_inspect_informations
 
 # # suppress all warnings
 # warnings.filterwarnings("ignore") # FIXME?
@@ -188,6 +187,13 @@ def train(
         delete_cols=["response"],
     )
     try:
+        model_inspect_informations = collect_model_inspect_informations(
+            model, "model_inspect_information_init"
+        )
+        logging_step = 0
+        swanlab.log(model_inspect_informations, step=logging_step,
+         print_to_console=True)
+
         pbar = tqdm(range(1, max_steps + 1))
         for step, batch in zip(pbar, iterator_train):
             tic = time.perf_counter()
@@ -237,9 +243,11 @@ def train(
             toc = time.perf_counter()
             durations.append(toc - tic)
 
+            
             swanlab.log({
                 "batch train loss": loss.item()
-            })
+            }, step=logging_step)
+            logging_step += 1
 
 
             # every couple of steps, evaluate; this can be slow due to generation
@@ -262,11 +270,12 @@ def train(
                 )
                 model.train()
 
+                swanlab.log({"example prediction": swanlab.Text(predictions[0])}, step=logging_step)
+
                 example = random.choice(predictions)
                 example = textwrap.shorten(example, width=750)
                 example = textwrap.indent(example, "    ")
                 print_verbose(f"\nExample prediction:\n{example}\n")
-                swanlab.log({"example prediction": swanlab.Text(example)})
                 accuracy = get_accuracy(predictions=predictions, responses=responses)
                 num_tokens_generated = sum(sum(mask) for mask in tokenizer(predictions)["attention_mask"])
 
@@ -294,7 +303,8 @@ def train(
                     metric
                 )
 
-                # log_dict = {
+                swanlab.log(metric, step=logging_step)
+                                # log_dict = {
                 #     "step": f"{step:5d}",
                 #     "samples": f"{total_samples:7d}",
                 #     "lr": f"{lr_scheduler.get_last_lr()[0]:.2e}",
@@ -309,7 +319,13 @@ def train(
                 #     "elapsed time": f"{elapsed // 60:.0f}min {elapsed % 60:.0f}s",
                 # }
                 print_verbose(json.dumps(metric))
-                swanlab.log(metric)
+
+                model_inspect_informations = collect_model_inspect_informations(model)
+
+                swanlab.log(model_inspect_informations, step=logging_step, print_to_console=True)
+                                
+
+
 
             # # TODO is this needed? No, 这会让我们无法占住显存。
             # torch.cuda.empty_cache()
@@ -339,7 +355,7 @@ def train(
             metric
         )
         print_verbose(json.dumps(metric))
-        swanlab.log(metric)
+        swanlab.log(metric, step=logging_step)
         # print_verbose(f"Test accuracy: {accuracy:.3f}")
 
     except KeyboardInterrupt:
@@ -512,3 +528,5 @@ if __name__ == "__main__":
         experiment_name=experiment_name,
         clean=args.clean,
     )
+
+# %%
