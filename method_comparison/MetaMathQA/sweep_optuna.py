@@ -1,4 +1,4 @@
-# Copyright 2025-present the HuggingFace Inc. team.
+# Copyright 2025-present Ye Canming.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ def main():
         direction=direction,
         load_if_exists=True, # Allows resuming
         pruner=optuna.pruners.HyperbandPruner(), 
-        sampler=optuna.samplers.CmaEsSampler()
+        sampler=optuna.samplers.CmaEsSampler(consider_pruned_trials=True)
     )
     
     # --- Run Optimization ---
