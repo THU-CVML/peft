@@ -2,3 +2,6 @@ bitsandbytes
 datasets
 numpy
 tqdm
+
+cmaes
+optuna
