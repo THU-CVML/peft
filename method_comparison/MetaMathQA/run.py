@@ -371,6 +371,7 @@ def train(
         print_verbose(f"encountered an error: {exc}")
         status = TrainStatus.CANCELED
         error_msg = str(exc)
+        raise exc
 
     toc_train = time.perf_counter()
     train_time = toc_train - tic_train - eval_time
