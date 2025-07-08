@@ -15,23 +15,19 @@
 """
 Hyperparameter sweep utility using Optuna.
 
-This script acts as a wrapper around `run.py`. For each Optuna trial, it:
-1. Creates a new, unique experiment directory with a path structure that is
-   compatible with the validation logic in run.py.
-2. Copies the base configuration from a template directory.
-3. Modifies configuration files (e.g., train_params.json) with hyperparameters suggested by Optuna.
-4. Spawns `run.py` as a subprocess and directly reads its standard output.
-5. Reports intermediate results (e.g., validation accuracy) back to Optuna for pruning.
-6. Returns the final metric (e.g., test accuracy) as the trial's objective value.
+This script supports two modes:
+1. `tune`: For efficient hyperparameter exploration using CMA-ES Sampler and Hyperband Pruner.
+2. `ablation`: For reproducible ablation studies using Grid Search and no pruning.
 """
 
 import argparse
 import json
-import os
+import operator
 import shutil
 import subprocess
 import sys
 import uuid
+from functools import reduce
 from pathlib import Path
 
 import optuna
@@ -51,18 +47,13 @@ def objective(trial: optuna.Trial, base_experiment_path: str, optuna_config: dic
     The Optuna objective function.
     """
     # 1. Create a unique directory for this trial that conforms to the expected path structure.
-    # The original path is like: .../experiments/<peft-method>/<experiment-name>
-    # The validation function expects this structure, so we create trial directories as siblings.
-    # New trial path: .../experiments/<peft-method>/<experiment-name>-trial-<number>-<uuid>
     base_path = Path(base_experiment_path)
-    # Using a unique ID to prevent conflicts if study is resumed or run in parallel.
     trial_name = f"{base_path.name}-trial-{trial.number}-{uuid.uuid4().hex[:8]}"
-    trial_path = base_path.parent.parent/ "optuna_sweeps" / trial_name
+    trial_path = base_path.parent.parent / "optuna_sweeps" / trial_name
 
     print(f"\n--- Starting Trial {trial.number} ---\nPath: {trial_path}")
 
-    # Copy the template directory to the new trial path. `trial_path` must not exist.
-    # We ignore the `optuna_sweep` dir (where the db is stored) to prevent recursive copying.
+    # Copy the template directory to the new trial path.
     shutil.copytree(
         base_experiment_path,
         trial_path,
@@ -79,11 +70,12 @@ def objective(trial: optuna.Trial, base_experiment_path: str, optuna_config: dic
         filetype = config_filename.split('.')[-1]
 
         with open(config_path, 'r') as f:
-            if filetype=="json":
-                config_data = json.load(f)  
-            elif filetype=="yaml":
+            if filetype == "json":
+                config_data = json.load(f)
+            elif filetype == "yaml":
                 config_data = yaml.safe_load(f)
-            else: raise NotImplementedError(f"Unsupported config file type: {filetype}")
+            else:
+                raise NotImplementedError(f"Unsupported config file type: {filetype}")
 
         for key_path, suggest_config in params.items():
             suggest_type = suggest_config['type']
@@ -96,9 +88,9 @@ def objective(trial: optuna.Trial, base_experiment_path: str, optuna_config: dic
             print(f"[Trial {trial.number}] Set {key_path} = {value}")
 
         with open(config_path, 'w') as f:
-            if filetype=="json":
+            if filetype == "json":
                 json.dump(config_data, f, indent=4)
-            elif filetype=="yaml":
+            elif filetype == "yaml":
                 yaml.safe_dump(config_data, f, default_flow_style=False, sort_keys=False)
             
     # 3. Launch run.py as a subprocess and capture its output
@@ -124,14 +116,12 @@ def objective(trial: optuna.Trial, base_experiment_path: str, optuna_config: dic
     # Open log file to save the output
     with open(log_path, 'w') as log_file:
         for line in iter(process.stdout.readline, ''):
-            # Print to console and save to log file simultaneously
             sys.stdout.write(line)
             log_file.write(line)
             
             try:
                 log_data = json.loads(line)
                 
-                # Report intermediate value for pruning
                 if intermediate_metric_key in log_data:
                     step = log_data.get("step")
                     metric_value = log_data[intermediate_metric_key]
@@ -147,7 +137,6 @@ def objective(trial: optuna.Trial, base_experiment_path: str, optuna_config: dic
                             process.kill()
                         raise optuna.TrialPruned()
 
-                # Store final value
                 if final_metric_key in log_data:
                      final_value = log_data[final_metric_key]
                      print(f"[Trial {trial.number}] Found final metric: {final_value}")
@@ -174,6 +163,13 @@ def main():
         type=str, 
         help="Path to the base experiment directory containing configs (train_params.json, optuna_config.yaml, etc.)"
     )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="tune",
+        choices=["tune", "ablation"],
+        help="Set the operation mode: 'tune' for hyperparameter search, 'ablation' for grid search."
+    )
     args = parser.parse_args()
 
     # --- Load Optuna Configuration ---
@@ -193,20 +189,42 @@ def main():
     n_trials = optuna_config.get("n_trials", 20)
     direction = optuna_config.get("direction", "maximize")
 
-    # The DB will be stored in an `optuna_sweep` folder inside the base experiment path.
-    # This is ignored during the copy process for each trial.
-    # storage_path = Path(args.path_experiment) / "optuna_sweep"
     storage_path = Path("/mnt/obs/ye_canming/boguan_yuequ/peft")
     storage_path.mkdir(exist_ok=True)
     storage_name = f"sqlite:///{storage_path / 'optuna_studies.db'}"
 
+    # --- Configure Sampler and Pruner based on mode ---
+    if args.mode == 'ablation':
+        print("\n[Mode: Ablation] Using Grid Search Sampler and disabling pruning for reproducibility.")
+        search_space = {}
+        for _, params in optuna_config.get('files', {}).items():
+            for _, suggest_config in params.items():
+                if suggest_config['type'] != 'categorical':
+                    raise ValueError(f"In 'ablation' mode, all hyperparameters must be of type 'categorical'.")
+                param_name = suggest_config['args']['name']
+                choices = suggest_config['args']['choices']
+                search_space[param_name] = choices
+        
+        sampler = optuna.samplers.GridSampler(search_space)
+        pruner = optuna.pruners.NopPruner()
+        
+        grid_size = reduce(operator.mul, (len(v) for v in search_space.values()), 1) if search_space else 1
+        if n_trials != grid_size:
+            print(f"Warning: In Grid Search mode, n_trials ({n_trials}) does not match the grid size ({grid_size}). Adjusting n_trials to {grid_size}.")
+            n_trials = grid_size
+    
+    elif args.mode == 'tune':
+        print("\n[Mode: Tune] Using CMA-ES Sampler and Hyperband Pruner for efficient tuning.")
+        sampler = optuna.samplers.CmaEsSampler(consider_pruned_trials=True)
+        pruner = optuna.pruners.HyperbandPruner()
+    
     study = optuna.create_study(
         study_name=study_name,
         storage=storage_name,
         direction=direction,
-        load_if_exists=True, # Allows resuming
-        pruner=optuna.pruners.HyperbandPruner(), 
-        sampler=optuna.samplers.CmaEsSampler(consider_pruned_trials=True)
+        load_if_exists=True,
+        pruner=pruner,
+        sampler=sampler
     )
     
     # --- Run Optimization ---
