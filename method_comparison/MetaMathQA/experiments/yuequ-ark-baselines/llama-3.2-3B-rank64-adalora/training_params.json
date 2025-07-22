@@ -1,0 +1,8 @@
+{
+    "optimizer_kwargs": {
+        "lr": 0.001,
+        "weight_decay": 0.1
+    },
+    "compile": true,
+    "batch_size": 8
+}

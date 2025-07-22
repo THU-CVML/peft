@@ -1,0 +1,11 @@
+# kernel_name: poly_comb
+# kernel_name: poly_degree+1
+kernel_name: poly*
+# "poly_degree+1", "poly_comb",
+latent_dim: 32
+modified_modules:
+- q_proj
+- v_proj
+lora_alpha: 16
+pissa: false
+use_dora: false

@@ -1,14 +1,17 @@
 import optuna
 
 from pathlib import Path
-storage_path = Path("/mnt/obs/ye_canming/boguan_yuequ/peft")
+# storage_path = Path("/mnt/obs/ye_canming/boguan_yuequ/peft")
+storage_path = Path(".")
 storage_path.mkdir(exist_ok=True)
 storage_name = f"sqlite:///{storage_path / 'optuna_studies.db'}"
 
 # 1. 加载你现有的 Study
 # 确保 study_name 和 storage 的路径是正确的
 study = optuna.load_study(
-    study_name="peft-method_comparison-MetaMathQA-gsm8k-ablation64-formal", 
+    # study_name="peft-method_comparison-MetaMathQA-gsm8k-ablation64-formal", 
+    # study_name="peft-method_comparison-MetaMathQA-gsm8k-ablation8-formal", 
+    study_name="peft-method_comparison-MetaMathQA-gsm8k-ablation32-formal", 
     storage=storage_name
 )
 

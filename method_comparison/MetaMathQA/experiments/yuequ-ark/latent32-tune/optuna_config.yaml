@@ -1,0 +1,85 @@
+# --- 1. 研究配置 (Study Configuration) ---
+# 您可以根据需要修改研究名称和试验总次数
+# study_name: "peft-method_comparison-MetaMathQA-gsm8k-ablation64-try"
+study_name: "peft-method_comparison-MetaMathQA-gsm8k-ablation32-tune"
+
+# study_name: "peft-method_comparison-MetaMathQA-gsm8k-yuequ-ark-rank8-tanh-pissa"
+n_trials: 100000
+direction: "maximize"
+
+# --- 2. 目标指标 (Target Metric) ---
+# 确保这些键名与 run.py 打印的JSON日志中的键名完全一致
+intermediate_metric: "valid accuracy"
+final_metric: "test accuracy"
+
+# --- 3. 超参数搜索空间 (Hyperparameter Search Space) ---
+files:
+  training_params.json:
+    optimizer_kwargs.lr:
+      type: "float"
+      args:
+        name: "learning_rate"
+        low: 1.0e-5 # 学习率搜索下限
+        high: 1.0e-3 # 学习率搜索上限
+        log: True    # 建议对学习率使用对数尺度搜索
+    optimizer_kwargs.weight_decay:
+      type: "float"
+      args:
+        name: "weight_decay"
+        low: 0.01
+        high: 0.2
+
+    # alpha 为 64
+  yuequ_config.yaml:
+    kernel_name:
+      type: "categorical"
+      args:
+        name: "kernel"
+        choices: ["tanh", "piecewise-linear*", "linear*", 
+            "swish", "mercer_tanh", "sigmoid", 
+            "poly_degree+1", "poly_comb", "chi2", "rbf_normalized"
+          ]
+    # latent_dim:
+    #   type: "categorical"
+    #   args:
+    #     name: "latent_dim"
+    #     choices: [4, 8, 16, 32, 64]
+    lora_alpha:
+      type: "categorical"
+      args:
+        name: "lora_alpha"
+        choices: [16, 32, 64]
+    pissa: 
+      type: "categorical"
+      args:
+        name: "pissa"
+        choices: [true, false]
+    use_dora: 
+      type: "categorical"
+      args:
+        name: "use_dora"
+        choices: [true, false]
+       
+
+        # low: 8
+        # high: 128
+        # log: True
+    
+
+    # grad_norm_clip:
+    #   type: "float"
+    #   args:
+    #     name: "grad_clip"
+    #     low: 0.8
+    #     high: 1.5
+    # optimizer_type:
+    #   type: "categorical"
+    #   args:
+    #     name: "optimizer"
+    #     choices: ["AdamW", "adafactor"] # 从这两个常见的优化器中选择
+    # batch_size 通常受显存限制，如果您的显存允许，也可以加入搜索
+    # batch_size:
+    #   type: "categorical"
+    #   args:
+    #     name: "batch_size"
+    #     choices: [2, 4, 8]

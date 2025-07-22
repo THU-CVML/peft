@@ -1,0 +1,8 @@
+kernel_name: swish
+latent_dim: 32
+modified_modules:
+- q_proj
+- v_proj
+lora_alpha: 32
+pissa: false
+use_dora: true

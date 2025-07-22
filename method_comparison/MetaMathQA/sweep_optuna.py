@@ -189,7 +189,8 @@ def main():
     n_trials = optuna_config.get("n_trials", 20)
     direction = optuna_config.get("direction", "maximize")
 
-    storage_path = Path("/mnt/obs/ye_canming/boguan_yuequ/peft")
+    # storage_path = Path("/mnt/obs/ye_canming/boguan_yuequ/peft")
+    storage_path = Path(".")
     storage_path.mkdir(exist_ok=True)
     storage_name = f"sqlite:///{storage_path / 'optuna_studies.db'}"
 

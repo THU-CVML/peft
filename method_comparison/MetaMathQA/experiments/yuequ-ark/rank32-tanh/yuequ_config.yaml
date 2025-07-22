@@ -1,0 +1,9 @@
+kernel_name: tanhv2
+latent_dim: 32
+modified_modules:
+- q_proj
+- v_proj
+lora_alpha: 128
+pissa: false
+# pissa: true
+use_dora: false

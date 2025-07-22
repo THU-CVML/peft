@@ -1,3 +1,5 @@
 deprecated
 optuna_sweeps
+optuna_sweeps*
 optuna_sweep
+unsloth_compiled_cache

@@ -15,7 +15,7 @@
 """
 Main entry point to run the experiments. Contains general setup and the proper training code.
 """
-
+# import unsloth
 import argparse
 import datetime as dt
 import gc
@@ -420,9 +420,10 @@ def main(*, path_experiment: str, experiment_name: str, clean: bool) -> None:
     train_config = get_train_config(path_train_config)
     set_seed(train_config.seed)
 
+    project_name = os.environ.get("SWANLAB_PROJECT_NAME", "peft-method_comparison-MetaMathQA-gsm8k")
     run = swanlab.init(
         # 设置项目
-        project="peft-method_comparison-MetaMathQA-gsm8k",
+        project=project_name,
         experiment_name = experiment_name, 
         description = path_experiment, 
         # 跟踪超参数与实验元数据

@@ -1,0 +1,51 @@
+# --- 1. 研究配置 (Study Configuration) ---
+# 您可以根据需要修改研究名称和试验总次数
+# study_name: "peft-method_comparison-MetaMathQA-gsm8k-ablation64-try"
+study_name: "peft-method_comparison-MetaMathQA-gsm8k-ablation32-formal"
+
+# export SWANLAB_PROJECT_NAME=peft-method_comparison-MetaMathQA-gsm8k-ablation32-formal
+
+# study_name: "peft-method_comparison-MetaMathQA-gsm8k-yuequ-ark-rank8-tanh-pissa"
+n_trials: 100000
+direction: "maximize"
+
+# --- 2. 目标指标 (Target Metric) ---
+# 确保这些键名与 run.py 打印的JSON日志中的键名完全一致
+intermediate_metric: "valid accuracy"
+final_metric: "test accuracy"
+
+# --- 3. 超参数搜索空间 (Hyperparameter Search Space) ---
+files:
+    # alpha 为 64
+  yuequ_config.yaml:
+    kernel_name:
+      type: "categorical"
+      args:
+        name: "kernel"
+        choices: ["tanh", "piecewise-linear*", "linear*", 
+            "swish", 
+            "swish_comb", 
+            # "mercer_tanh", 
+            # "sigmoid", 
+            # "poly_degree+1", # 还没调试好
+            "poly_combv2", 
+            "tanh_comb", 
+
+            # "chi2", "rbf_normalized"
+          ]
+    lora_alpha:
+      type: "categorical"
+      args:
+        name: "lora_alpha"
+        choices: [16, 32, 64, 128]
+    pissa: 
+      type: "categorical"
+      args:
+        name: "pissa"
+        choices: [true, false]
+    use_dora: 
+      type: "categorical"
+      args:
+        name: "use_dora"
+        choices: [true, false]
+      
