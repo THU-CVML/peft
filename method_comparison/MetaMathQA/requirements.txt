@@ -5,3 +5,10 @@ tqdm
 
 cmaes
 optuna
+
+swanlab
+liger_kernel
+flash-attn
+deepspeed
+accelerate
+unsloth
