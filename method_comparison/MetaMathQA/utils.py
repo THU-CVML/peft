@@ -200,24 +200,43 @@ def init_cuda() -> int:
     return cuda_memory_init
 
 
+import os
+use_unsloth = os.environ.get("USE_UNSLOTH", "0") == "1"
+
+    
 
 model_id_groups = [
     ["LLM-Research/Llama-3.2-3B", # prefered
      "unsloth/Llama-3.2-3B", "meta-llama/Llama-3.2-3B"],
-
+    # ["unsloth/Llama-3.2-3B", # prefered
+    #  "LLM-Research/Llama-3.2-3B", 
+    #  "meta-llama/Llama-3.2-3B"],
 ]
+if use_unsloth:
+    model_id_groups = [
+        [l[1], l[0]]+l[2:] for l in model_id_groups
+    ]
+
 model_id_map = dict()
 for group in model_id_groups:
     for alias in group[1:]:
         model_id_map[alias] = group[0]
     
+
+if use_unsloth:
+    # from unsloth import FastModel
+    from unsloth import FastLanguageModel as FastModel
+
 def get_tokenizer(*, model_id: str, max_seq_length: int):
     if model_id in model_id_map:
         model_id = model_id_map[model_id]
-    # unsloth
-    # _, tokenizer = FastModel.from_pretrained(model_id)
-    # modelscope
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+    if use_unsloth:
+        # unsloth
+        _, tokenizer = FastModel.from_pretrained(model_id)
+    else:
+        # modelscope
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 
     tokenizer.model_max_length = max_seq_length
@@ -225,7 +244,6 @@ def get_tokenizer(*, model_id: str, max_seq_length: int):
         tokenizer.pad_token = tokenizer.eos_token
     return tokenizer
 
-# from unsloth import FastModel
 import torch
 
 def get_base_model(
@@ -246,22 +264,36 @@ def get_base_model(
         'load_in_4bit': False, 
         'load_in_8bit': False,
     }
+    if use_unsloth:
+        kwargs.pop("pretrained_model_name_or_path")
+    # torch.backends.cuda.enable_mem_efficient_sdp(enabled=True)
     if dtype == "int4":
-        quant_config = BitsAndBytesConfig(load_in_4bit=True)
-        kwargs["quantization_config"] = quant_config
-        # kwargs['load_in_4bit'] = True
+        if use_unsloth:
+            # unsloth
+            kwargs["load_in_4bit"] = True
+        else:
+            quant_config = BitsAndBytesConfig(load_in_4bit=True)
+            kwargs["quantization_config"] = quant_config
     elif dtype == "int8":
-        quant_config = BitsAndBytesConfig(load_in_8bit=True)
-        kwargs["quantization_config"] = quant_config
-        # kwargs['load_in_8bit'] = True
+        if use_unsloth:
+            # unsloth
+            kwargs["load_in_8bit"] = True
+        else:
+            quant_config = BitsAndBytesConfig(load_in_8bit=True)
+            kwargs["quantization_config"] = quant_config
     elif dtype == "bfloat16":
-        kwargs["torch_dtype"] = torch.bfloat16
-        # kwargs["dtype"] = torch.bfloat16
-        kwargs["attn_implementation"] = attn_implementation or "flash_attention_2"
+        if use_unsloth:
+            kwargs["dtype"] = torch.bfloat16
+        else:
+            kwargs["torch_dtype"] = torch.bfloat16
+            kwargs["attn_implementation"] = attn_implementation or "flash_attention_2"
+
     elif dtype == "float16":
-        kwargs["torch_dtype"] = torch.float16
-        # kwargs["dtype"] = torch.float16
-        kwargs["attn_implementation"] = attn_implementation or "flash_attention_2"
+        if use_unsloth:
+            kwargs["dtype"] = torch.float16
+        else:
+            kwargs["torch_dtype"] = torch.float16
+            kwargs["attn_implementation"] = attn_implementation or "flash_attention_2"
         # 50 min -> 30 min
     elif dtype != "float32":
         raise ValueError(f"Invalid dtype: {dtype}")
@@ -270,8 +302,10 @@ def get_base_model(
     from liger_kernel.transformers import apply_liger_kernel_to_llama
     apply_liger_kernel_to_llama()
 
-    # model, _ = FastModel.from_pretrained(model_id, **kwargs)
-    model = AutoModelForCausalLM.from_pretrained(**kwargs)
+    if use_unsloth:
+        model, _ = FastModel.from_pretrained(model_id, **kwargs)
+    else: 
+        model = AutoModelForCausalLM.from_pretrained(**kwargs)
 
     if dtype in ["int8", "int4"]:
         model = prepare_model_for_kbit_training(model)

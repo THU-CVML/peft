@@ -15,7 +15,11 @@
 """
 Main entry point to run the experiments. Contains general setup and the proper training code.
 """
-# import unsloth
+import os
+use_unsloth = os.environ.get("USE_UNSLOTH", "0") == "1"
+if use_unsloth:
+    import unsloth
+    os.environ["UNSLOTH_USE_MODELSCOPE"] = "1"
 import argparse
 import datetime as dt
 import gc
