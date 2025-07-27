@@ -5,6 +5,7 @@ tqdm
 
 cmaes
 optuna
+optuna-dashboard
 
 swanlab
 liger_kernel
