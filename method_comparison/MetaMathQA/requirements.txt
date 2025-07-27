@@ -13,3 +13,5 @@ flash-attn
 deepspeed
 accelerate
 unsloth
+modelscope
+-r ../requirements-app.txt
