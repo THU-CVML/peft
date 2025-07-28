@@ -1,19 +1,32 @@
-import optuna
+from dataclasses import dataclass, field, asdict
 
+
+@dataclass
+class OptunaConfig:
+    name: str = "peft-method_comparison-MetaMathQA-gsm8k-ablation32-formal"
+    file: str = "optuna_studies.db"  # optuna 存储文件名
+    # peft-method_comparison-MetaMathQA-gsm8k-ablation64-formal
+    # peft-method_comparison-MetaMathQA-gsm8k-ablation8-formal
+    storage_path: str = "."  # obs 共享存储 "/mnt/obs/ye_canming/boguan_yuequ/peft"
+
+
+from transformers import HfArgumentParser
+
+parser = HfArgumentParser(OptunaConfig)
+args = parser.parse_args_into_dataclasses()[0]
+
+import optuna
 from pathlib import Path
-# storage_path = Path("/mnt/obs/ye_canming/boguan_yuequ/peft")
-storage_path = Path(".")
+
+storage_path = Path(args.storage_path)
 storage_path.mkdir(exist_ok=True)
-storage_name = f"sqlite:///{storage_path / 'optuna_studies.db'}"
+
+storage_name = f"sqlite:///{storage_path / args.file}"
+
 
 # 1. 加载你现有的 Study
 # 确保 study_name 和 storage 的路径是正确的
-study = optuna.load_study(
-    # study_name="peft-method_comparison-MetaMathQA-gsm8k-ablation64-formal", 
-    # study_name="peft-method_comparison-MetaMathQA-gsm8k-ablation8-formal", 
-    study_name="peft-method_comparison-MetaMathQA-gsm8k-ablation32-formal", 
-    storage=storage_name
-)
+study = optuna.load_study(study_name=args.name, storage=storage_name)
 
 # 2. 找出所有失败的 trial
 failed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.FAIL]
@@ -25,3 +38,5 @@ for trial in failed_trials:
     # trial.params 包含了导致失败的那组参数
     study.enqueue_trial(trial.params)
     print(f"已将参数 {trial.params} 重新加入队列。")
+
+# https://stackoverflow.com/questions/77599820/how-can-i-retry-fail-trials-in-optuna-in-a-second-run
