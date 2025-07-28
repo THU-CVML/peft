@@ -3,4 +3,4 @@ optuna_sweeps
 optuna_sweeps*
 optuna_sweep
 unsloth_compiled_cache
-optuna_studies.db
+# optuna_studies.db
