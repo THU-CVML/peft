@@ -441,7 +441,8 @@ def main(*, path_experiment: str, experiment_name: str, clean: bool) -> None:
 
     # initialize objects
     cuda_memory_init = init_cuda()
-    tokenizer = get_tokenizer(model_id=train_config.model_id, max_seq_length=train_config.max_seq_length)
+    tokenizer = get_tokenizer(model_id=train_config.model_id, max_seq_length=train_config.max_seq_length, 
+                              padding_side=train_config.padding_side)
 
     model_info = get_base_model_info(train_config.model_id)
     metamath_info = get_dataset_info("meta-math/MetaMathQA")

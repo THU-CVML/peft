@@ -1,0 +1,8 @@
+kernel_name: tanh
+latent_dim: 8
+modified_modules:
+- q_proj
+- v_proj
+lora_alpha: 16
+pissa: false
+use_dora: false

@@ -3,6 +3,6 @@
         "lr": 0.001,
         "weight_decay": 0.1
     },
-    "compile": true,
+    "compile": false,
     "batch_size": 8
 }

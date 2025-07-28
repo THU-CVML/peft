@@ -18,6 +18,7 @@ All utilities not related to data handling.
 
 import enum
 import json
+import json5 as json
 import os
 import platform
 import subprocess
@@ -45,9 +46,6 @@ import peft
 from peft import PeftConfig, get_peft_model, prepare_model_for_kbit_training
 from peft.optimizers import create_lorafa_optimizer, create_loraplus_optimizer
 from peft.utils import SAFETENSORS_WEIGHTS_NAME
-
-
-
 
 
 if not torch.cuda.is_available():
@@ -115,6 +113,7 @@ class TrainConfig:
     autocast_adapter_dtype: bool
     generation_kwargs: dict[str, Any]
     attn_implementation: Optional[str]
+    padding_side: Literal["left", "right"] = "right"  # left or right, for unsloth, it is always right
 
     def __post_init__(self) -> None:
         if not isinstance(self.model_id, str):
@@ -201,33 +200,37 @@ def init_cuda() -> int:
 
 
 import os
+
 use_unsloth = os.environ.get("USE_UNSLOTH", "0") == "1"
 
-    
 
 model_id_groups = [
-    ["LLM-Research/Llama-3.2-3B", # prefered
-     "unsloth/Llama-3.2-3B", "meta-llama/Llama-3.2-3B"],
+    [
+        "LLM-Research/Llama-3.2-3B",  # prefered
+        "unsloth/Llama-3.2-3B",
+        "meta-llama/Llama-3.2-3B",
+    ],
     # ["unsloth/Llama-3.2-3B", # prefered
-    #  "LLM-Research/Llama-3.2-3B", 
+    #  "LLM-Research/Llama-3.2-3B",
     #  "meta-llama/Llama-3.2-3B"],
 ]
 if use_unsloth:
-    model_id_groups = [
-        [l[1], l[0]]+l[2:] for l in model_id_groups
-    ]
+    model_id_groups = [[l[1], l[0]] + l[2:] for l in model_id_groups]
 
 model_id_map = dict()
 for group in model_id_groups:
     for alias in group[1:]:
         model_id_map[alias] = group[0]
-    
+
 
 if use_unsloth:
     # from unsloth import FastModel
     from unsloth import FastLanguageModel as FastModel
 
-def get_tokenizer(*, model_id: str, max_seq_length: int):
+
+def get_tokenizer(
+    *, model_id: str, max_seq_length: int, padding_side: Literal["left", "right"] = "right"
+) -> transformers.PreTrainedTokenizer:
     if model_id in model_id_map:
         model_id = model_id_map[model_id]
 
@@ -236,15 +239,16 @@ def get_tokenizer(*, model_id: str, max_seq_length: int):
         _, tokenizer = FastModel.from_pretrained(model_id)
     else:
         # modelscope
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-
+        tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side=padding_side)
 
     tokenizer.model_max_length = max_seq_length
     if not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.eos_token
     return tokenizer
 
+
 import torch
+
 
 def get_base_model(
     *,
@@ -253,7 +257,6 @@ def get_base_model(
     compile: bool,
     attn_implementation: Optional[str],
 ) -> nn.Module:
-    
     if model_id in model_id_map:
         model_id = model_id_map[model_id]
 
@@ -261,8 +264,8 @@ def get_base_model(
         "pretrained_model_name_or_path": model_id,
         "device_map": device,
         "attn_implementation": attn_implementation,
-        'load_in_4bit': False, 
-        'load_in_8bit': False,
+        "load_in_4bit": False,
+        "load_in_8bit": False,
     }
     if use_unsloth:
         kwargs.pop("pretrained_model_name_or_path")
@@ -297,20 +300,21 @@ def get_base_model(
         # 50 min -> 30 min
     elif dtype != "float32":
         raise ValueError(f"Invalid dtype: {dtype}")
-    
+
     if use_unsloth:
         model, _ = FastModel.from_pretrained(model_id, **kwargs)
-    else: 
+    else:
         model = AutoModelForCausalLM.from_pretrained(**kwargs)
 
     from auto_liger_kernel import make_liger_kernel
+
     model = make_liger_kernel(model)
     if dtype in ["int8", "int4"]:
         model = prepare_model_for_kbit_training(model)
 
-# 不要unsloth，
+    # 不要unsloth，
 
-# 不要compile，反而慢
+    # 不要compile，反而慢
     if compile:
         model = torch.compile(model)
 
@@ -325,7 +329,7 @@ def get_model(
     attn_implementation: Optional[str],
     peft_config: Optional[PeftConfig],
     autocast_adapter_dtype: bool,
-    yuequ_config:Optional[Dict],
+    yuequ_config: Optional[Dict],
 ) -> nn.Module:
     base_model = get_base_model(
         model_id=model_id, dtype=dtype, compile=compile, attn_implementation=attn_implementation
@@ -333,20 +337,19 @@ def get_model(
     if peft_config is None:
         model = base_model
     else:
-        model = get_peft_model(base_model, peft_config, 
-                               autocast_adapter_dtype=autocast_adapter_dtype
-                               )
-        
+        model = get_peft_model(base_model, peft_config, autocast_adapter_dtype=autocast_adapter_dtype)
+
     if yuequ_config is not None:
         from boguan_yuequ.algorithms.lora.kernel_lora.auto import get_light_kernel_tuning_model
+
         model = get_light_kernel_tuning_model(
-            model=model, 
-            kernel_dtype = eval(f"torch.{dtype}"), 
-            # kernel_dtype = torch.float, 
-            **yuequ_config
+            model=model,
+            kernel_dtype=eval(f"torch.{dtype}"),
+            # kernel_dtype = torch.float,
+            **yuequ_config,
         )
         model = model.cuda()
-        
+
     return model
 
 
@@ -688,9 +691,7 @@ def log_to_console(log_data: dict[str, Any], print_fn: Callable[..., None]) -> N
     print_fn(f"file size of checkpoint: {file_size / 2**20:.1f}MB")
 
 
-def log_to_file(
-    *, log_data: dict, save_dir: str, experiment_name: str, print_fn: Callable[..., None]
-) -> None:
+def log_to_file(*, log_data: dict, save_dir: str, experiment_name: str, print_fn: Callable[..., None]) -> None:
     file_name = f"{experiment_name.replace(os.path.sep, '--')}.json"
     file_name = os.path.join(save_dir, file_name)
     with open(file_name, "w") as f:
@@ -791,6 +792,4 @@ def log_results(
     }
 
     log_to_console(log_data, print_fn=print)  # use normal print to be able to redirect if so desired
-    log_to_file(
-        log_data=log_data, save_dir=save_dir, experiment_name=experiment_name, print_fn=print_fn
-    )
+    log_to_file(log_data=log_data, save_dir=save_dir, experiment_name=experiment_name, print_fn=print_fn)
