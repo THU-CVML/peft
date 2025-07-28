@@ -95,9 +95,10 @@ def objective(trial: optuna.Trial, base_experiment_path: str, optuna_config: dic
             
     # 3. Launch run.py as a subprocess and capture its output
     log_path = trial_path / f"trial_{trial.number}.log"
-    # command = [sys.executable, "run.py", str(trial_path), "--verbose"]
-    command = [sys.executable, "run_accelerate.py", str(trial_path), "--verbose"]
-    
+    command = [sys.executable, "run.py", str(trial_path), "--verbose"]
+    # command = [sys.executable, "run_accelerate.py", str(trial_path), "--verbose"]
+    # command = ["accelerate", "launch", "--config_file", "./accelerate.yaml", "--num_processes", "1", "run_accelerate.py", str(trial_path), "--verbose"]
+
     print(f"[Trial {trial.number}] Executing command: {' '.join(command)}")
     
     process = subprocess.Popen(
