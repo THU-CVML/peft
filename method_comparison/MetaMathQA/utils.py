@@ -298,15 +298,13 @@ def get_base_model(
     elif dtype != "float32":
         raise ValueError(f"Invalid dtype: {dtype}")
     
-    # https://github.com/linkedin/Liger-Kernel#patching
-    from liger_kernel.transformers import apply_liger_kernel_to_llama
-    apply_liger_kernel_to_llama()
-
     if use_unsloth:
         model, _ = FastModel.from_pretrained(model_id, **kwargs)
     else: 
         model = AutoModelForCausalLM.from_pretrained(**kwargs)
 
+    from auto_liger_kernel import make_liger_kernel
+    model = make_liger_kernel(model)
     if dtype in ["int8", "int4"]:
         model = prepare_model_for_kbit_training(model)
 
