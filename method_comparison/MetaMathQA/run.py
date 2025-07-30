@@ -196,7 +196,7 @@ def train(
         )
         logging_step = 0
         swanlab.log(model_inspect_informations, step=logging_step,
-         print_to_console=True)
+         print_to_console=False)
 
         pbar = tqdm(range(1, max_steps + 1))
         for step, batch in zip(pbar, iterator_train):
@@ -326,7 +326,7 @@ def train(
 
                 model_inspect_informations = collect_model_inspect_informations(model)
 
-                swanlab.log(model_inspect_informations, step=logging_step, print_to_console=True)
+                swanlab.log(model_inspect_informations, step=logging_step, print_to_console=False)
                                 
 
 
