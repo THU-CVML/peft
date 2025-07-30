@@ -1,0 +1,10 @@
+{
+    "optimizer_kwargs": {
+        "lr": 1e-4,
+        "weight_decay": 1e-1
+    },
+    "compile": false,
+    "batch_size": 1,
+    "model_id": "Qwen/Qwen2.5-3B", 
+    "padding_side": "left"
+}
