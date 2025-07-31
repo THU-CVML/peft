@@ -1,0 +1,2 @@
+arch_name,task_type,peft_type,auto_mapping,base_model_name_or_path,revision,inference_mode,target_modules,exclude_modules,modules_to_save,rpc,trainable_params,total_params
+Qwen/Qwen2.5-3B,SEQ_CLS,LN_TUNING,,/home/ye_canming/.cache/modelscope/hub/models/Qwen/Qwen2___5-3B,,False,{'post_attention_layernorm'},,"['classifier', 'score']",2.3891595865692066e-05,73728,3085938688

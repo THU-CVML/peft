@@ -321,6 +321,15 @@ def get_base_model(
     return model
 
 
+from scholarly_infrastructure.logging.torch import (
+        model_rich_tree,
+        print_model_pretty,
+        num_of_trainable_parameters,
+        num_of_total_parameters,
+    )
+import csv
+import swanlab
+    
 def get_model(
     *,
     model_id: str,
@@ -334,6 +343,9 @@ def get_model(
     base_model = get_base_model(
         model_id=model_id, dtype=dtype, compile=compile, attn_implementation=attn_implementation
     )
+    total_params = (base_model).num_of_trainable_parameters()
+    print(f"Total trainable parameters: {total_params}")
+
     if peft_config is None:
         model = base_model
     else:
@@ -349,6 +361,46 @@ def get_model(
             **yuequ_config,
         )
         model = model.cuda()
+
+    # 检查
+    # 可训练参数
+    yuequ_params = (model).num_of_trainable_parameters()
+    print(f"YueQu trainable parameters: {yuequ_params}")
+    # RPC, 相对参数成本
+    print(f"RPC = {yuequ_params / total_params:.2%} of total parameters")
+
+    swanlab.log(dict(
+        rpc = yuequ_params / total_params,
+        trainable_params = yuequ_params,
+        total_params = total_params,    
+    ))
+    rpc_infos = dict(
+        arch_name = model_id, 
+        **(yuequ_config or dict()), 
+        **asdict(peft_config) if peft_config is not None else dict(),
+    )
+    # 更新信息到 ./rpc_infos.csv
+
+    rpc_infos["rpc"] = yuequ_params / total_params
+    rpc_infos["trainable_params"] = yuequ_params
+    rpc_infos["total_params"] = total_params
+    rpc_infos_path = os.path.join("./rpc_infos.csv")
+
+    # 检查文件是否存在
+    file_exists = os.path.isfile(rpc_infos_path)
+
+    # 以追加模式写入csv文件
+    with open(rpc_infos_path, mode="a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=rpc_infos.keys())
+
+        # 如果文件不存在，写入表头
+        if not file_exists:
+            writer.writeheader()
+
+        # 写入当前行
+        writer.writerow(rpc_infos)
+
+    print(f"RPC infos saved to {rpc_infos_path}")
 
     return model
 
