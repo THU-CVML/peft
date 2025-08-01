@@ -1,0 +1,67 @@
+# --- 1. 研究配置 (Study Configuration) ---
+# 您可以根据需要修改研究名称和试验总次数
+# study_name: "peft-method_comparison-MetaMathQA-gsm8k-ablation64-try"
+study_name: "peft-method_comparison-MetaMathQA-gsm8k-ablation64-lr-sota"
+
+# study_name: "peft-method_comparison-MetaMathQA-gsm8k-yuequ-ark-rank8-tanh-pissa"
+n_trials: 1000
+direction: "maximize"
+
+# --- 2. 目标指标 (Target Metric) ---
+# 确保这些键名与 run.py 打印的JSON日志中的键名完全一致
+intermediate_metric: "valid accuracy"
+final_metric: "test accuracy"
+
+# --- 3. 超参数搜索空间 (Hyperparameter Search Space) ---
+files:
+  yuequ_config.yaml:
+    kernel_name:
+      type: "categorical"
+      args:
+        name: "kernel"
+        choices: [ "piecewise-linear*", "linear*", "swish", 
+          ]
+    # latent_dim:
+    #   type: "categorical"
+    #   args:
+    #     name: "latent_dim"
+    #     choices: [4, 8, 16, 32, 64]
+    # lora_alpha:
+    #   type: "categorical"
+    #   args:
+    #     name: "lora_alpha"
+    #     choices: [16, 32, 64]
+    pissa: 
+      type: "categorical"
+      args:
+        name: "pissa"
+        choices: [true, false]
+    use_dora: 
+      type: "categorical"
+      args:
+        name: "use_dora"
+        choices: [true, false]
+       
+
+        # low: 8
+        # high: 128
+        # log: True
+    
+
+    # grad_norm_clip:
+    #   type: "float"
+    #   args:
+    #     name: "grad_clip"
+    #     low: 0.8
+    #     high: 1.5
+    # optimizer_type:
+    #   type: "categorical"
+    #   args:
+    #     name: "optimizer"
+    #     choices: ["AdamW", "adafactor"] # 从这两个常见的优化器中选择
+    # batch_size 通常受显存限制，如果您的显存允许，也可以加入搜索
+    # batch_size:
+    #   type: "categorical"
+    #   args:
+    #     name: "batch_size"
+    #     choices: [2, 4, 8]
