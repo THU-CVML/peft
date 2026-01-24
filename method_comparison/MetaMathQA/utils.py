@@ -18,7 +18,9 @@ All utilities not related to data handling.
 
 import enum
 import json
-import json5 as json
+import json5
+json.load = json5.load
+json.loads = json5.loads
 import os
 import platform
 import subprocess
@@ -157,12 +159,13 @@ def validate_experiment_path(path: str) -> str:
 
     # check path structure
     path_parts = path.rstrip(os.path.sep).split(os.path.sep)
-    if (len(path_parts) != 3) or (path_parts[-3] != "experiments"):
-        raise ValueError(
-            f"Path {path} does not have the correct structure, should be ./experiments/<peft-method>/<experiment-name>"
-        )
+    # if (len(path_parts) != 3) or (path_parts[-3] != "experiments"):
+    #     raise ValueError(
+    #         f"Path {path} does not have the correct structure, should be ./experiments/<peft-method>/<experiment-name>"
+    #     )
 
-    experiment_name = os.path.join(*path_parts[-2:])
+    # experiment_name = os.path.join(*path_parts[-2:])
+    experiment_name = f"{path_parts[-3]}/{path_parts[-1]}"
     return experiment_name
 
 
@@ -171,10 +174,19 @@ def get_train_config(path: str) -> TrainConfig:
     with open(FILE_NAME_DEFAULT_TRAIN_PARAMS) as f:
         default_config_kwargs = json.load(f)
 
-    config_kwargs = {}
-    if os.path.exists(path):
-        with open(path) as f:
-            config_kwargs = json.load(f)
+    # config_kwargs = {}
+    # if os.path.exists(path):
+    #     with open(path) as f:
+    #         config_kwargs = json.load(f)
+    from skinfra.experiment import load_config, save_config, load_overlaying_config, iterate_path_hierarchy
+    from pathlib import Path
+    path = Path(path)
+    config_kwargs = load_overlaying_config(
+        path.parent, 
+        path.name, 
+        verbose=True
+    )
+
 
     config_kwargs = {**default_config_kwargs, **config_kwargs}
     return TrainConfig(**config_kwargs)
@@ -214,6 +226,24 @@ model_id_groups = [
     #  "LLM-Research/Llama-3.2-3B",
     #  "meta-llama/Llama-3.2-3B"],
 ]
+from dotenv import load_dotenv
+load_dotenv()
+import os
+modelscope_path = os.getenv(
+    "MODELSCOPE_MODELSPATH", None
+)
+if modelscope_path is not None:
+    for size in [0.5, 1.5, 3, 7]:
+        model_id_groups.append(
+            [
+                os.path.join(modelscope_path, f"Qwen/Qwen2.5-{size}B"),
+                f"Qwen/Qwen2.5-{size}B",
+            ]
+        )
+
+
+
+
 if use_unsloth:
     model_id_groups = [[l[1], l[0]] + l[2:] for l in model_id_groups]
 
